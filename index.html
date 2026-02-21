@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentinel</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <div id="app">
+      <!-- Header -->
+      <header id="header">
+        <div class="header-left">
+          <span class="logo-icon">&#9670;</span>
+          <h1>SENTINEL</h1>
+        </div>
+        <span class="header-subtitle">on-device mac diagnostics</span>
+      </header>
+
+      <!-- Module Selector Bar -->
+      <section id="module-bar">
+        <div id="module-list" class="module-list"></div>
+      </section>
+
+      <!-- Input Area -->
+      <section id="input-area">
+        <form id="command-form">
+          <div class="input-row">
+            <input
+              type="text"
+              id="command-input"
+              placeholder="describe your problem or ask for diagnostics..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="submit" id="submit-btn" title="Run command">
+              <span class="btn-icon">&#9654;</span>
+            </button>
+            <button type="button" id="mic-btn" title="Voice input (coming soon)" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+        <div id="routing-info" class="routing-info hidden"></div>
+      </section>
+
+      <!-- Quick Action Buttons -->
+      <section id="quick-actions">
+        <button class="quick-btn" data-command="check cpu usage">CPU</button>
+        <button class="quick-btn" data-command="check memory usage">MEM</button>
+        <button class="quick-btn" data-command="check disk space">DISK</button>
+        <button class="quick-btn" data-command="show network connections">NET</button>
+        <button class="quick-btn" data-command="check battery status">BATT</button>
+        <button class="quick-btn" data-command="check security status">SEC</button>
+        <button class="quick-btn accent" data-command="run full health checkup">FULL CHECKUP</button>
+      </section>
+
+      <!-- Results Area -->
+      <section id="results-area">
+        <div id="results-container">
+          <!-- Result cards are inserted here -->
+          <div id="empty-state" class="empty-state">
+            <div class="empty-icon">&#9670;</div>
+            <p>Type a command or tap a quick action to begin diagnostics</p>
+            <p class="dim">Try: "why is my mac slow?" or "check cpu usage"</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Status Bar -->
+      <footer id="status-bar">
+        <span id="status-text">Ready</span>
+        <span id="status-engine" class="dim">engine: hybrid | tools: 12</span>
+      </footer>
+    </div>
+  </body>
+</html>
