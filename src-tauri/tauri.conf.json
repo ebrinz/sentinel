@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Sentinel — Mac Diagnostics",
+        "title": "Sentinel",
         "width": 900,
         "height": 700
       }
