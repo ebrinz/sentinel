@@ -56,6 +56,10 @@ async fn execute_tool(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Load .env from the repo root (sentinel/)
+    let env_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.env");
+    let _ = dotenvy::from_path(&env_path);
+
     let mut registry = tools::ModuleRegistry::new();
     registry
         .register(Arc::new(tools::mac_troubleshoot::MacTroubleshootModule::new()))
