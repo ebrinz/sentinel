@@ -648,4 +648,61 @@ mod tests {
         assert_eq!(result.source, "cloud (fallback)");
         assert!(result.tool_result.is_none());
     }
+
+    /// Simulate Whisper-style transcriptions and verify they route correctly.
+    #[test]
+    fn test_whisper_voice_phrases() {
+        let e = engine();
+
+        // Phrases a user might say, including common Whisper mis-transcriptions
+        let cases: Vec<(&str, &str)> = vec![
+            // Direct matches
+            ("Check CPU usage.", "monitor_cpu"),
+            ("Check my CPU.", "monitor_cpu"),
+            ("How's my CPU doing?", "monitor_cpu"),
+            ("Show me CPU.", "monitor_cpu"),
+            ("Check memory usage.", "monitor_memory"),
+            ("How much memory is being used?", "monitor_memory"),
+            ("How much RAM do I have?", "monitor_memory"),
+            ("Check disk space.", "monitor_disk"),
+            ("How much storage is left?", "monitor_disk"),
+            ("Show network connections.", "monitor_network"),
+            ("Check my internet connection.", "monitor_network"),
+            ("My WiFi is slow.", "diagnose_network"),
+            ("Check battery status.", "diagnose_battery"),
+            ("How's my battery?", "diagnose_battery"),
+            ("Check security status.", "check_security"),
+            ("Is my firewall on?", "check_security"),
+            ("Run a full checkup.", "run_full_checkup"),
+            ("Run full health check.", "run_full_checkup"),
+            ("What are my startup items?", "check_startup_items"),
+            ("Kill Safari.", "kill_process"),
+            ("Clear the cache.", "clear_caches"),
+            // Natural voice commands
+            ("My computer is slow.", "monitor_cpu"),
+            ("Why is my Mac slow?", "monitor_cpu"),
+            ("Check the engine.", "check_engine"),
+            ("What's my tire pressure?", "check_tires"),
+            ("Check fluid levels.", "check_fluids"),
+        ];
+
+        let mut passed = 0;
+        let mut failed = 0;
+
+        for (phrase, expected_tool) in &cases {
+            let (name, _, conf) = e.local_route(phrase, &[]);
+            if name == *expected_tool {
+                passed += 1;
+            } else {
+                failed += 1;
+                eprintln!(
+                    "FAIL: \"{}\" → {} (conf={:.2}), expected {}",
+                    phrase, name, conf, expected_tool
+                );
+            }
+        }
+
+        eprintln!("\nVoice routing: {}/{} passed", passed, passed + failed);
+        assert!(failed == 0, "{} voice phrases routed incorrectly", failed);
+    }
 }

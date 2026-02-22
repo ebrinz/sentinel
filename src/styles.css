@@ -292,13 +292,54 @@ body {
 }
 
 #mic-btn {
-  opacity: 0.4;
-  cursor: not-allowed;
+  cursor: pointer;
+}
+
+#mic-btn:hover {
+  background: var(--green-bg);
+  border-color: var(--green-dim);
+  color: var(--green);
+}
+
+#mic-btn:active {
+  transform: scale(0.95);
 }
 
 #mic-btn svg {
   width: 14px;
   height: 14px;
+}
+
+#mic-btn.loading {
+  cursor: wait;
+  pointer-events: none;
+}
+
+#mic-btn.loading svg {
+  display: none;
+}
+
+#mic-btn.loading::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+}
+
+#mic-btn.recording {
+  opacity: 1;
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-bg);
+  animation: pulse-recording 1s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Routing info */

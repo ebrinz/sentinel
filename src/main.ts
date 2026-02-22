@@ -44,6 +44,12 @@ let moduleList: HTMLElement;
 let modules: ModuleInfo[] = [];
 let selectedModule: string | null = null;
 
+// Audio recording state
+let isRecording = false;
+let mediaRecorder: MediaRecorder | null = null;
+let audioChunks: Blob[] = [];
+let micBtn: HTMLButtonElement;
+
 // Tool-to-quick-command mapping
 const TOOL_QUICK_COMMANDS: Record<string, { label: string; command: string }> = {
   monitor_cpu: { label: "CPU", command: "check cpu usage" },
@@ -81,6 +87,8 @@ window.addEventListener("DOMContentLoaded", () => {
   emptyState = document.getElementById("empty-state");
   moduleList = document.getElementById("module-list") as HTMLElement;
 
+  micBtn = document.getElementById("mic-btn") as HTMLButtonElement;
+
   commandForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = commandInput.value.trim();
@@ -88,6 +96,11 @@ window.addEventListener("DOMContentLoaded", () => {
       processCommand(text);
     }
   });
+
+  micBtn.addEventListener("click", toggleRecording);
+
+  // Check if Whisper model files exist — if so, mic is usable (loads on first click)
+  checkWhisperAvailable();
 
   // Quick action buttons
   document.querySelectorAll(".quick-btn").forEach((btn) => {
@@ -187,10 +200,12 @@ async function processCommand(input: string): Promise<void> {
   hideEmptyState();
 
   try {
+    statusText.textContent = `Routing: "${input}"`;
     const result = await invoke<RouteResult>("process_command", {
       input,
       module: selectedModule,
     });
+    statusText.textContent = `Routed "${input}" → ${result.tool_name} (${result.source}, ${(result.confidence * 100).toFixed(0)}%)`;
     showRoutingInfo(result);
     addResultCard(result, input);
     updateStatusBar(result);
@@ -990,4 +1005,138 @@ function escapeHtml(text: string): string {
 function asArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// Whisper Model Readiness
+// ---------------------------------------------------------------------------
+
+async function checkWhisperAvailable(): Promise<void> {
+  try {
+    const available = await invoke<boolean>("whisper_ready");
+    if (available) {
+      micBtn.title = "Voice input (loads on first use)";
+    } else {
+      micBtn.classList.add("loading");
+      micBtn.title = "Whisper model not found";
+    }
+  } catch {
+    micBtn.classList.add("loading");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Audio Recording + Whisper Transcription
+// ---------------------------------------------------------------------------
+
+async function toggleRecording(): Promise<void> {
+  if (isRecording) {
+    // Stop recording
+    mediaRecorder?.stop();
+    isRecording = false;
+    micBtn.classList.remove("recording");
+    statusText.textContent = "Processing audio...";
+    return;
+  }
+
+  // Show recording state immediately for visual feedback
+  micBtn.classList.add("recording");
+  statusText.textContent = "Requesting microphone access...";
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      // Stop all tracks so the browser releases the mic
+      stream.getTracks().forEach((t) => t.stop());
+
+      if (audioChunks.length === 0) return;
+
+      const blob = new Blob(audioChunks, { type: mediaRecorder!.mimeType });
+      commandInput.value = "Transcribing...";
+      commandInput.disabled = true;
+      statusText.textContent = "Transcribing audio with Whisper...";
+
+      try {
+        const pcmBytes = await blobToPcm16k(blob);
+        statusText.textContent = `Sending ${pcmBytes.length} bytes to Whisper (first use may take a moment)...`;
+
+        // Encode as base64 to avoid massive JSON arrays
+        const base64 = uint8ToBase64(pcmBytes);
+        const text = await invoke<string>("transcribe_audio", {
+          audioB64: base64,
+        });
+
+        if (text) {
+          commandInput.value = text;
+          commandInput.disabled = false;
+          processCommand(text);
+        } else {
+          commandInput.value = "";
+          commandInput.disabled = false;
+          statusText.textContent = "Transcription returned empty result";
+        }
+      } catch (err) {
+        commandInput.value = "";
+        commandInput.disabled = false;
+        const msg = err instanceof Error ? err.message : String(err);
+        statusText.textContent = `Transcription error: ${msg}`;
+        addErrorCard("Voice Transcription Failed", msg);
+      }
+    };
+
+    mediaRecorder.start();
+    isRecording = true;
+    statusText.textContent = "Recording... click mic to stop";
+  } catch (err) {
+    // getUserMedia failed — remove recording state
+    micBtn.classList.remove("recording");
+    const msg = err instanceof Error ? err.message : String(err);
+    statusText.textContent = `Mic error: ${msg}`;
+    console.error("getUserMedia failed:", err);
+  }
+}
+
+/**
+ * Convert a recorded audio Blob to 16-bit PCM at 16 kHz mono.
+ * Uses OfflineAudioContext for resampling.
+ */
+async function blobToPcm16k(blob: Blob): Promise<Uint8Array> {
+  const arrayBuf = await blob.arrayBuffer();
+  const audioCtx = new AudioContext();
+  const decoded = await audioCtx.decodeAudioData(arrayBuf);
+  audioCtx.close();
+
+  // Resample to 16 kHz mono via OfflineAudioContext
+  const numSamples = Math.ceil(decoded.duration * 16000);
+  const offline = new OfflineAudioContext(1, numSamples, 16000);
+  const source = offline.createBufferSource();
+  source.buffer = decoded;
+  source.connect(offline.destination);
+  source.start(0);
+  const rendered = await offline.startRendering();
+
+  // Convert float32 → int16
+  const float32 = rendered.getChannelData(0);
+  const int16 = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+
+  return new Uint8Array(int16.buffer);
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }

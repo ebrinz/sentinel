@@ -341,7 +341,7 @@ impl CactusModel {
 
         let mut buf: Vec<u8> = vec![0u8; RESPONSE_BUF_SIZE];
 
-        let rc = unsafe {
+        let _rc = unsafe {
             cactus_transcribe(
                 self.handle,
                 c_audio.as_ptr(),
@@ -356,10 +356,18 @@ impl CactusModel {
             )
         };
 
-        check(rc)?;
-
+        // Like complete(), the return code encodes the token count, not an error.
         let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-        Ok(String::from_utf8_lossy(&buf[..len]).into_owned())
+        let response = String::from_utf8_lossy(&buf[..len]).into_owned();
+
+        if response.is_empty() {
+            Err(CactusError {
+                code: _rc,
+                message: last_error(),
+            })
+        } else {
+            Ok(response)
+        }
     }
 
     /// Transcribe audio from raw PCM data (int16, 16 kHz).
@@ -368,7 +376,7 @@ impl CactusModel {
 
         let mut buf: Vec<u8> = vec![0u8; RESPONSE_BUF_SIZE];
 
-        let rc = unsafe {
+        let _rc = unsafe {
             cactus_transcribe(
                 self.handle,
                 ptr::null(),
@@ -383,10 +391,19 @@ impl CactusModel {
             )
         };
 
-        check(rc)?;
-
+        // Like complete(), the return code encodes the token count, not an error.
+        // Read the buffer regardless.
         let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-        Ok(String::from_utf8_lossy(&buf[..len]).into_owned())
+        let response = String::from_utf8_lossy(&buf[..len]).into_owned();
+
+        if response.is_empty() {
+            Err(CactusError {
+                code: _rc,
+                message: last_error(),
+            })
+        } else {
+            Ok(response)
+        }
     }
 
     /// Compute text embeddings.
